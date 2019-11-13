@@ -1,0 +1,233 @@
+/*
+  Analog Input
+
+  The circuit:
+  - Gauge control from PWM
+pwmoutput value to gauge
+reference
+- <120 = vac - (unknown out) - <1 Vin analog
+- 102 = 0psi - (~2 out)      - 1.02 Vin analog
+- 155 = 7 psi - (~3.04 Vout) - 1.125 Vin analog
+- 210 = 14 psi (~4.2 Vout)   - 2.25 Vin analog 
+- 240 = maxed out gauge
+255/5 * Voltage = pwmoutput
+
+v.    psi
+0.2 = -14
+.37=-10
+.54 = -7
+.88 = -3.5
+.90 = -2
+.98 = -1
+1.10 =0
+1.28=1
+1.34=2
+1.4=3.5
+1.5= 5
+1.55 =6
+1.75=7
+1.8=8
+1.9 =9
+1.97=10.5
+2.05= 12
+2.2=13
+2.38= 14
+2.5 =15
+2.73 = 16'ish
+2.93 = 17+
+
+
+
+*/
+
+#include <Wire.h>
+#include <Adafruit_MCP4725.h> 
+
+Adafruit_MCP4725 dac;
+
+// Set this value to 9, 8, 7, 6 or 5 to adjust the resolution
+#define DAC_RESOLUTION    (8)
+
+const int numReadings = 10;
+int sensorPin = A0;    // select the input pin for the potentiometer
+int ledPin = 13;      // select the pin for the LED
+int sensorValue = 0;  // variable to store the value coming from the sensor
+int gaugepin = 3;    // gauge connected to digital pin 3
+int sweepValue = 0; // where to increment the gauge
+float readings[numReadings]; //readings from the sensor
+int readIndex = 0; //reading index count
+int readtotal = 0; //total of all readings
+int lastsweep = 0; //the last sweep value
+
+void setup() {
+
+ Serial.begin(9600);
+ for (int thisReading = 0; thisReading < numReadings; thisReading++) {
+    readings[thisReading] = 0;
+ }
+//  dac.begin(0x62);
+
+   //performs sweep up   
+   for (sweepValue = 0 ; sweepValue <= 240; sweepValue += 5) {
+   //  sets the value (range from 0 to 255):
+    analogWrite(gaugepin, sweepValue);
+   //  wait for smooth operation
+    delay(20); 
+   }
+   //perform sweep back down 
+   for (sweepValue = 240 ; sweepValue >= 0; sweepValue -= 5) {
+   // sets the value (range from 0 to 240):
+   analogWrite(gaugepin, sweepValue);
+   // wait for smooth operation
+    delay(20);
+}
+delay (120);
+ sweepValue = 0.1;
+ lastsweep = 0;
+ analogWrite(gaugepin, sweepValue);
+ delay (60);
+}
+
+
+void loop() {
+
+     //  smooths sensor input
+ while (readIndex <= numReadings) {
+     // subtract the last reading:
+  readtotal = readtotal - readings[readIndex];
+     // read from the sensor:
+  readings[readIndex] = analogRead(sensorPin);
+  Serial.println(readings[readIndex]);
+     // add the reading to the total:
+  readtotal = readtotal + readings[readIndex];
+     // advance to the next position in the array:
+  readIndex = readIndex + 1;
+     // if we're at the end of the array...
+    delay(1);
+  }
+  readIndex = 0;
+    // calculate the average:
+  sensorValue = readtotal / numReadings;
+  // send it to the computer as ASCII digits
+  Serial.println("the smoothed sensor value");
+  Serial.println(sensorValue);
+  float voltageAnalog = sensorValue * (5.0 / 1023.0);
+  
+ Serial.println("my voltage");
+ Serial.println(voltageAnalog);
+sweepValue = 255 * (voltageAnalog/5);  //get the value for sweep based on the sensor
+
+ //start gauge business
+  if (0 <= voltageAnalog && voltageAnalog < 0.25)
+  {
+  
+  if (lastsweep<sweepValue)
+   {
+   for (lastsweep <= sweepValue; lastsweep += 5) {
+   //  sets the value (range from old to current):
+    analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);    
+  }}
+  else if (lastsweep>sweepValue){
+       for (lastsweep >= sweepValue; lastsweep -= 5) {
+   // sets the value (range from old to current):
+   analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);
+  }}
+
+  if (.32 <= voltageAnalog && voltageAnalog < 0.34)
+  {
+  
+  if (lastsweep<sweepValue)
+   {
+   for (lastsweep <= sweepValue; lastsweep += 5) {
+   //  sets the value (range from old to current):
+    analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);    
+  }}
+  else if (lastsweep>sweepValue){
+       for (lastsweep >= sweepValue; lastsweep -= 5) {
+   // sets the value (range from old to current):
+   analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);
+  }}
+ 
+ delay(30);
+  
+ 
+  }
+
+    /*
+if (0.20 < voltageAnalog && voltageAnalog < 0.22)
+  {
+   sweepValue = 94;
+   if (lastsweep<sweepValue)
+   {
+   for (lastsweep <= sweepValue; lastsweep += 5) {
+   //  sets the value (range from old to current):
+    analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);    
+  }}
+  else if (lastsweep>sweepValue){
+       for (lastsweep >= sweepValue; lastsweep -= 5) {
+   // sets the value (range from 0 to 240):
+   analogWrite(gaugepin, lastsweep);
+   //  wait for smooth operation
+    delay(20);
+  }}
+ lastsweep=sweepValue;
+ delay(30);
+  
+ 
+  }
+
+ 
+ else  if (0.23 < voltageAnalog && voltageAnalog <.25)
+  {
+    sweepValue = 30;
+  analogWrite(gaugepin, sweepValue); 
+     Serial.println("else");
+     delay(30);
+  }
+ else if (voltageAnalog < 4.2 && voltageAnalog > 4.1)
+ {
+    sweepValue = 210;
+  analogWrite(gaugepin, sweepValue); 
+     Serial.println("not max");
+     delay(30);
+ }
+ else if (voltageAnalog > 4.2 && voltageAnalog < 5.1)
+ {
+    sweepValue = 210;
+  analogWrite(gaugepin, sweepValue); 
+     Serial.println("max");
+     delay(30);
+ }
+ else
+ {
+  sweepValue = 0;
+  analogWrite(gaugepin, sweepValue); 
+  Serial.println("off");
+     delay(30);
+ }
+/////////////////
+  if (voltageAnalog < 1.0)
+  {
+   sweepValue = 0;
+   analogWrite(gaugepin, sweepValue);
+  }
+  // turn the ledPin on
+//  digitalWrite(ledPin, HIGH);
+  // stop the program for <sensorValue> milliseconds:
+  delay(sensorValue);
+ //analogWrite(gaugepin, 0);
+  // turn the ledPin off:
+ // digitalWrite(ledPin, LOW);
+  // stop the program for for <sensorValue> milliseconds:
+  delay(sensorValue);*/
+}
